@@ -1,0 +1,780 @@
+/*
+ * Trammel's look is borrowed from the drafting table.
+ *
+ * - The chrome is the pale green of a drawing-board cover, and the sketch is
+ *   a sheet of paper lying on it.
+ * - Lettering is National Park, a typeface drawn from router-cut signs, the
+ *   same single-stroke style as the stencil lettering on technical drawings.
+ * - Colour carries meaning, as it does in CAD: blue can still move, ink is
+ *   pinned down, red contradicts. Selection is a swipe of yellow highlighter,
+ *   so it never hides which of those three a shape is.
+ */
+
+:root {
+  --board: #d5e0d1;
+  --board-deep: #c2d0be;
+  --board-edge: #a3b6a0;
+  --sheet: #fbfcf7;
+  --grid-minor: #ecf1e8;
+  --grid-major: #dbe4d6;
+  --ink: #14211a;
+  --ink-soft: #46584d;
+  --free: #1d55cc;
+  --red: #c2301a;
+  --amber: #765000;
+  --mark: #ffd21f;
+  --halo: rgba(255, 210, 31, 0.9);
+  --halo-soft: rgba(255, 210, 31, 0.45);
+  --on-mark: #14211a;
+  --font: 'National Park Variable', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --board: #18231c;
+    --board-deep: #25352b;
+    --board-edge: #3b4f43;
+    --sheet: #0e1511;
+    --grid-minor: #141d17;
+    --grid-major: #1f2b23;
+    --ink: #e8f0ea;
+    --ink-soft: #a3b6a9;
+    --free: #7faaff;
+    --red: #ff7b66;
+    --amber: #e8b84a;
+    --halo: rgba(255, 210, 31, 0.5);
+    --halo-soft: rgba(255, 210, 31, 0.25);
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--board);
+  color: var(--ink);
+  font: 400 15px/1.4 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+p,
+ul,
+dl,
+dd {
+  margin: 0;
+  padding: 0;
+}
+
+ul {
+  list-style: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--board-edge);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+select:hover {
+  background: var(--board-deep);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.icon {
+  flex: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- Frame -------------------------------------------------------------- */
+
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 14px;
+}
+
+.brand {
+  margin-right: 6px;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tool-group[role='radiogroup'] {
+  gap: 0;
+}
+
+.tool-group[role='radiogroup'] button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.tool-group[role='radiogroup'] button:first-child {
+  margin-left: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.tool-group[role='radiogroup'] button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.tool.is-active,
+.tool.is-active:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--board);
+  position: relative;
+}
+
+.file-group {
+  margin-left: auto;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 316px;
+  gap: 14px;
+  min-height: 0;
+  padding: 0 14px 14px;
+}
+
+/* ---- The sheet ---------------------------------------------------------- */
+
+.sheet {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--sheet);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgba(20, 33, 26, 0.14),
+    0 10px 22px -14px rgba(20, 33, 26, 0.55);
+}
+
+.sheet-svg {
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.sheet-svg.is-drawing {
+  cursor: crosshair;
+}
+
+.sheet-svg.is-over {
+  cursor: grab;
+}
+
+.sheet-svg.is-dragging {
+  cursor: grabbing;
+}
+
+.grid-minor,
+.grid-major {
+  fill: none;
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.grid-minor {
+  stroke: var(--grid-minor);
+}
+
+.grid-major {
+  stroke: var(--grid-major);
+}
+
+.shape {
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+}
+
+.shape.is-hover {
+  stroke-width: 3.2;
+}
+
+.dot {
+  fill: var(--sheet);
+  stroke-width: 1.7;
+}
+
+.dot.is-hover {
+  stroke-width: 3;
+}
+
+.is-set {
+  stroke: var(--ink);
+}
+
+.is-free {
+  stroke: var(--free);
+}
+
+.is-conflict {
+  stroke: var(--red);
+}
+
+.dot.is-pinned.is-set {
+  fill: var(--ink);
+}
+
+.dot.is-pinned.is-free {
+  fill: var(--free);
+}
+
+.dot.is-pinned.is-conflict {
+  fill: var(--red);
+}
+
+.halo {
+  fill: none;
+  stroke: var(--halo);
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+
+.halo-dot {
+  fill: var(--halo);
+}
+
+.halo.is-emphasised {
+  stroke: var(--halo-soft);
+}
+
+.halo-dot.is-emphasised {
+  fill: var(--halo-soft);
+}
+
+.dimension-line {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+}
+
+.dimension-head {
+  fill: var(--ink-soft);
+}
+
+.dimension-text {
+  font: 500 13.5px var(--font);
+  fill: var(--ink);
+  stroke: var(--sheet);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  cursor: pointer;
+}
+
+.dimension.is-conflict .dimension-line {
+  stroke: var(--red);
+}
+
+.dimension.is-conflict .dimension-head,
+.dimension.is-conflict .dimension-text {
+  fill: var(--red);
+}
+
+.dimension.is-emphasised .dimension-text {
+  fill: var(--on-mark);
+  stroke: var(--mark);
+}
+
+.badge {
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.badge rect {
+  fill: var(--sheet);
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.badge g {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.badge.is-conflict {
+  color: var(--red);
+}
+
+.badge.is-redundant rect {
+  stroke-dasharray: 2.5 2;
+}
+
+.badge.is-emphasised {
+  color: var(--on-mark);
+}
+
+.badge.is-emphasised rect {
+  fill: var(--mark);
+}
+
+.preview {
+  fill: none;
+  stroke: var(--free);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.preview-dot {
+  fill: var(--free);
+}
+
+.snap-ring {
+  fill: none;
+  stroke: var(--free);
+  stroke-width: 1.5;
+}
+
+.sheet-notes {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  gap: 8px;
+  max-width: min(440px, calc(100% - 76px));
+  pointer-events: none;
+}
+
+.hint,
+.notice {
+  justify-self: start;
+  padding: 5px 10px;
+  border-radius: 3px;
+  background: var(--sheet);
+  font-size: 0.9rem;
+}
+
+.hint {
+  color: var(--ink-soft);
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--red);
+  color: var(--red);
+  pointer-events: auto;
+}
+
+.notice button {
+  min-height: 26px;
+  border-color: currentColor;
+}
+
+.zoom-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+}
+
+.zoom-controls button {
+  justify-content: center;
+  width: 34px;
+  padding: 0;
+  margin-top: -1px;
+  border-radius: 0;
+  background: var(--sheet);
+  border-color: var(--board-edge);
+}
+
+.zoom-controls button:hover {
+  background: var(--grid-major);
+}
+
+/* ---- Title block -------------------------------------------------------- */
+
+.title-block {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: min(320px, calc(100% - 28px));
+  border: 1.5px solid var(--ink);
+  background: var(--sheet);
+}
+
+.title-block > * + * {
+  border-top: 1px solid var(--ink);
+}
+
+.title-block-name input {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-weight: 600;
+}
+
+.title-block-name input:hover {
+  background: var(--grid-minor);
+}
+
+.title-block-status {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 10px;
+}
+
+.title-block-status strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.title-block-status span {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.state-under .title-block-status strong {
+  color: var(--free);
+}
+
+.state-over .title-block-status strong {
+  color: var(--red);
+}
+
+.title-block-facts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.title-block-facts div {
+  padding: 5px 10px 6px;
+}
+
+.title-block-facts div + div {
+  border-left: 1px solid var(--ink);
+}
+
+.title-block-facts dt {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
+.title-block-facts dd {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Panel -------------------------------------------------------------- */
+
+.panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 4px 12px 2px;
+}
+
+.panel section + section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--board-edge);
+}
+
+.panel h2 {
+  margin-bottom: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.panel-intro p {
+  max-width: 34em;
+}
+
+.count {
+  margin-left: 4px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.quiet {
+  color: var(--ink-soft);
+}
+
+.guide {
+  margin-top: 10px;
+  font-size: 0.92rem;
+}
+
+.guide div {
+  display: grid;
+  grid-template-columns: 8.4em 1fr;
+  gap: 10px;
+  padding: 4px 0;
+  border-top: 1px dotted var(--board-edge);
+}
+
+.guide dt {
+  font-weight: 600;
+}
+
+.guide dd {
+  color: var(--ink-soft);
+}
+
+.selection-summary {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+}
+
+.selection-summary b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.option-list {
+  display: grid;
+  gap: 6px;
+}
+
+.option-list button {
+  width: 100%;
+  gap: 10px;
+  padding: 7px 10px;
+  text-align: left;
+  background: var(--sheet);
+  border-color: var(--board-edge);
+}
+
+.option-list button:hover:not(:disabled) {
+  background: var(--sheet);
+  border-color: var(--ink);
+}
+
+.option-list span {
+  display: grid;
+}
+
+.option-list b {
+  font-weight: 600;
+}
+
+.option-list small {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.constraint-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 2px 5px 6px;
+  border-left: 3px solid transparent;
+  border-top: 1px dotted var(--board-edge);
+}
+
+.constraint-row.is-emphasised {
+  background: var(--board-deep);
+}
+
+.constraint-row.is-conflict {
+  border-left-color: var(--red);
+}
+
+.constraint-row.is-redundant {
+  border-left-color: var(--amber);
+}
+
+.constraint-text b {
+  font-weight: 600;
+}
+
+.constraint-text > span {
+  color: var(--ink-soft);
+}
+
+.constraint-text em {
+  display: block;
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.is-conflict .constraint-text em {
+  color: var(--red);
+}
+
+.is-redundant .constraint-text em {
+  color: var(--amber);
+}
+
+.value-box {
+  width: 74px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--board-edge);
+  border-radius: 3px;
+  background: var(--sheet);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.remove {
+  justify-content: center;
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--ink-soft);
+}
+
+.remove:hover:not(:disabled) {
+  color: var(--red);
+}
+
+/* ---- Small screens ------------------------------------------------------ */
+
+@media (max-width: 780px) {
+  html,
+  body,
+  #root {
+    height: auto;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .toolbar {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .brand {
+    width: 100%;
+  }
+
+  .tool span {
+    display: none;
+  }
+
+  .tool {
+    width: 42px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .file-group {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .file-group button,
+  .file-group select {
+    padding: 0 9px;
+  }
+
+  .file-group select {
+    flex: 1 1 96px;
+    min-width: 0;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 10px 14px;
+  }
+
+  .sheet {
+    height: 62dvh;
+    min-height: 340px;
+  }
+
+  .panel {
+    overflow: visible;
+  }
+
+  .title-block {
+    right: 8px;
+    bottom: 8px;
+    width: min(250px, calc(100% - 16px));
+  }
+
+  .title-block-facts,
+  .title-block-status span {
+    display: none;
+  }
+
+  .title-block-status strong {
+    font-size: 1.15rem;
+  }
+
+  .title-block-status {
+    padding: 6px 10px 7px;
+  }
+}
